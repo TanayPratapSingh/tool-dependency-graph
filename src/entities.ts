@@ -186,4 +186,20 @@ export const ENTITIES: Entity[] = [
   },
 
   // ---------- People, cross service ----------
+  {
+    id: "person.email_address",
+    label: "Person email address",
+    services: ["*"],
+    aliases: [
+      "email", "email_address", "recipient_email", "to", "cc", "bcc",
+      "to_email", "recipient", "attendee_email", "member_email", "user_email",
+    ],
+    objectNouns: ["CONTACT", "CONTACTS", "PEOPLE", "PERSON", "DIRECTORY", "EMAIL_ADDRESS", "EMAIL_ADDRESSES"],
+    opaque: false,
+    notes:
+      "Semi opaque. A user often knows the address, but when they supply only a name "
+      + "a contacts lookup has to run first. This is the readme's second worked example.",
+  },
+
+  // ---------- Google Calendar ----------
 ];

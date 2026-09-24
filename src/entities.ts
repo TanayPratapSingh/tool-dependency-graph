@@ -532,3 +532,61 @@ export const ENTITIES: Entity[] = [
     opaque: true,
   },
 ];
+
+const BY_ID = new Map(ENTITIES.map((e) => [e.id, e]));
+export const entityById = (id: EntityId): Entity | undefined => BY_ID.get(id);
+
+/**
+ * Leaf names that are content the user authors, never a handle fetched from a
+ * prior call. Keeps freeform text out of the dependency graph.
+ */
+const USER_SUPPLIED = new Set([
+  "subject", "body", "message_body", "text", "content", "title", "description",
+  "comment", "comment_body", "note", "notes", "summary", "snippet", "message",
+  "query", "q", "search_query", "keywords", "name", "display_name", "filename",
+  "commit_message", "location", "timezone", "time_zone", "start_time", "end_time",
+  "start_date", "end_date", "due_date", "date", "datetime", "recurrence",
+  "mime_type", "content_type", "color", "url", "link", "html", "markdown",
+]);
+
+/** Paging, formatting and other machine set knobs that are not dependencies. */
+const CONTROL_PARAMS = new Set([
+  "page", "per_page", "page_size", "page_token", "next_page_token", "cursor",
+  "limit", "offset", "max_results", "maxresults", "order", "order_by", "sort",
+  "direction", "format", "fields", "include", "expand", "filter", "state",
+  "verbose", "dry_run", "force", "user_id", "userid",
+  // auth and GraphQL protocol plumbing, supplied by the connection not a prior tool
+  "access_token", "client_id", "client_secret", "refresh_token", "api_key",
+  "client_mutation_id", "headers", "accept",
+]);
+
+export type SlotCategory = "tool_derived" | "user_supplied" | "control" | "enum_or_constant" | "unresolved";
+
+export type SlotResolution = {
+  entityId: EntityId | null;
+  category: SlotCategory;
+  /** why the classifier landed here, carried through to the write up */
+  reason: string;
+};
+
+function normalizeName(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/** Singular and plural forms collapse, so label_ids matches label_id. */
+function nameVariants(name: string): string[] {
+  const base = normalizeName(name);
+  const variants = new Set([base]);
+  if (base.endsWith("s")) variants.add(base.slice(0, -1));
+  variants.add(`${base}s`);
+  return [...variants];
+}
+
+/**
+ * Resolves one input slot to a canonical entity, scoped to the owning service.
+ * Returns null rather than guessing when nothing matches cleanly.
+ */

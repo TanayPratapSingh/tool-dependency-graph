@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tool dependency graph</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #fafafa;
+    --line: #e6e6e9;
+    --line-strong: #d2d2d7;
+    --ink: #17181b;
+    --ink-2: #55565c;
+    --ink-3: #8a8b93;
+    --produces: #1f6feb;
+    --requires: #b25e09;
+    --focus: #1f6feb;
+    --node-entity: #17181b;
+    --node-tool: #b6b7bd;
+    --node-label: #8a8b93;
+    --halo: #ffffff;
+
+    --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0e10;
+      --surface: #131417;
+      --line: #26272b;
+      --line-strong: #34353a;
+      --ink: #eceded;
+      --ink-2: #a1a2a8;
+      --ink-3: #74757b;
+      --produces: #5a9cf8;
+      --requires: #e0963c;
+      --focus: #5a9cf8;
+      --node-entity: #eceded;
+      --node-tool: #4a4b52;
+      --node-label: #74757b;
+      --halo: #0d0e10;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+
+  /* ---------- header ---------- */
+
+  header { padding: var(--s4) var(--s5) var(--s3); border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .stats { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
+  .stats b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ---------- controls ---------- */
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center;
+    padding: var(--s3) var(--s5);
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  select, input[type="search"] {
+    font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line-strong); border-radius: 4px;
+    padding: 5px var(--s2); min-width: 0;
+  }
+  input[type="search"] { width: 200px; }
+  input[type="search"]::placeholder { color: var(--ink-3); }
+
+  .check { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; cursor: pointer; }
+  .check input { accent-color: var(--focus); margin: 0; }
+
+  .legend { display: flex; gap: var(--s4); margin-left: auto; color: var(--ink-2); font-size: 13px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .key { width: 14px; height: 2px; background: currentColor; }
+  .key.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--node-entity); }
+
+  /* ---------- layout ---------- */
+
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; flex: 1; min-height: 0; }
+  #cy { position: relative; min-height: 0; background: var(--bg); }
+
+  .cap {
+    position: absolute; left: var(--s4); bottom: var(--s3);
+    font-size: 12px; color: var(--ink-3); pointer-events: none;
+  }
+
+  aside {
+    border-left: 1px solid var(--line);
+    padding: var(--s4) var(--s5) var(--s6);
+    overflow-y: auto; min-height: 0;
+  }
+
+  /* ---------- inspector ---------- */
+
+  .placeholder { color: var(--ink-3); margin: 0; }
+
+  .kicker { color: var(--ink-3); font-size: 12px; margin: 0 0 2px; }
+  .subject { font: 600 13px/1.4 var(--mono); word-break: break-all; margin: 0; }
+  .meta { color: var(--ink-2); font-size: 13px; margin: var(--s2) 0 0; }
+
+  h2 {
+    font-size: 13px; font-weight: 600; color: var(--ink);
+    margin: var(--s5) 0 var(--s2);
+    padding-top: var(--s3); border-top: 1px solid var(--line);
+  }
+  h2 .count { color: var(--ink-3); font-weight: 400; }
+
+  ul { margin: 0; padding: 0; list-style: none; }
+  li { margin-bottom: 5px; }
+
+  code { font: 12px/1.5 var(--mono); color: var(--ink); word-break: break-all; }
+
+  .tag {
+    font-size: 11px; color: var(--ink-2);
+    border: 1px solid var(--line-strong); border-radius: 3px;
+    padding: 0 4px; margin-left: 4px; white-space: nowrap;
+  }
+  .none { color: var(--ink-3); margin: 0; }
+
+  .group { margin-bottom: var(--s3); }
+  .group > code { color: var(--ink-2); }
+  .group ul { margin-top: var(--s1); padding-left: var(--s3); border-left: 1px solid var(--line); }
+
+  @media (max-width: 880px) {
+    .split { grid-template-columns: 1fr; }
+    #cy { height: 58vh; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+    .legend { margin-left: 0; width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tool dependency graph</h1>
+  <p class="stats" id="stats"></p>
+</header>
+
+<div class="controls">
+  <select id="service" aria-label="Service"></select>
+  <input type="search" id="search" placeholder="Search tools" aria-label="Search tools" />
+  <label class="check" title="Show only handles a user cannot reasonably know, so they must come from a prior call">
+    <input type="checkbox" id="opaqueOnly" checked /> Opaque handles only</label>
+  <label class="check" title="Ignore optional inputs">
+    <input type="checkbox" id="requiredOnly" /> Required only</label>
+  <div class="legend">
+    <span><i class="key dot"></i>entity</span>
+    <span style="color:var(--produces)"><i class="key"></i>produces</span>
+    <span style="color:var(--requires)"><i class="key"></i>requires</span>
+  </div>
+</div>
+
+<div class="split">
+  <div id="cy"></div>
+  <aside id="panel" aria-live="polite">
+    <p class="placeholder">Select a tool or an entity to see what it needs and what can supply it.</p>
+  </aside>
+</div>
+
+</body>
+</html>

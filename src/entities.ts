@@ -729,3 +729,44 @@ export function slugImpliesProduction(slug: string, entity: Entity): boolean {
   return match !== null && match.hit;
 }
 
+export function producerScore(
+  producerSlug: string,
+  entity: Entity,
+  via: "schema" | "slug_inference",
+  outputDepth: number,
+  primary: boolean,
+  sameService = false,
+  sameToolkit = false,
+): number {
+  let score = via === "schema" ? 50 : 0;
+
+  // Cross service entities such as person.email_address are genuinely shared,
+  // but an agent working in Gmail should not be told to call GITHUB_GET_A_USER
+  // to find an address. Locality wins unless nothing local exists.
+  if (sameService) score += 70;
+  if (sameToolkit) score += 30;
+
+  // A tool whose own object is this entity is the canonical way to obtain it.
+  if (primary) score += 100;
+
+  const match = verbAndObject(producerSlug, entity);
+  if (match) {
+    if (match.verb === "read") score += 30;
+    if (match.hit) score += 40;
+  }
+
+  // Depth is the incidental producer signal. A repo name at data.items[].name
+  // on a repository listing is the point of the call. The same name at
+  // data.repository.owner.login inside a workflow run is a passenger.
+  score -= Math.max(0, outputDepth - 1) * 12;
+
+  const tokens = producerSlug.split("_").length;
+  score -= Math.min(24, tokens * 2);
+
+  if (producerSlug.includes("_LIST_")) score += 8;
+  if (producerSlug.includes("_SEARCH_")) score += 6;
+
+  return score;
+}
+
+

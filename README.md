@@ -113,3 +113,84 @@ answer as much as "what do I call first".
 list, and it is how the entities for `repository_id`, `project_id`, `runner_id`
 and `invitation_id` were found.
 
+## Results
+
+Measured on a production catalog of 1,391 tools across two large toolkits.
+
+| | |
+| --- | --- |
+| Tools | 1,391 |
+| Canonical entities | 46 |
+| Edges | 3,278 |
+| Input slots | 7,102, of which 2,728 are required |
+| Required slots resolved to an entity | 1,770 of 2,728 (65%) |
+| Of those, with at least one producer | 1,768 of 1,770 (99.9%) |
+| Tools with a real output schema | 1,239 of 1,391 (89%) |
+| Tools needing the slug inference fallback | 0 |
+| Handle shaped slots with no entity yet | 568 |
+
+Two of those are easy to misread, so to be explicit: **99.9% is coverage of the
+slots that resolved to an entity, not of all required inputs.** The honest
+version is that 65% of required inputs are typed handles, and almost all of
+those can be satisfied by another tool. The rest are content the user writes,
+paging knobs, enums, and 568 handles the registry does not cover yet.
+
+The slug inference fallback fired **zero** times. Real output schemas covered
+every tool that needed one, so every edge traces to a declared output field.
+
+## Checking it
+
+```bash
+python3 check.py
+```
+
+Eight hand written assertions. All eight pass. Each one started out failing, and
+four of them are the bugs above: the bare `id` under `threads[]`, cross service
+producers leaking into a plan, requiredness not compounding through an optional
+parent, and the head noun error.
+
+## Running it
+
+```bash
+bun install
+bun run src/graph.ts   # build the graph
+bun run src/viz.ts     # rebuild graph.html
+python3 check.py       # verify
+```
+
+With no catalog of your own this runs against `data/sample/catalog.json`, eight
+tools chosen to exercise every resolution path, and writes
+`data/graph.sample.json` so a full build is never clobbered.
+
+### Using your own catalog
+
+Drop one or more JSON files into `data/catalog/`. Each is an array of tools:
+
+```json
+[
+  {
+    "slug": "LIST_THREADS",
+    "name": "List threads",
+    "description": "...",
+    "toolkit": { "slug": "mail" },
+    "inputParameters":  { "type": "object", "properties": {}, "required": [] },
+    "outputParameters": { "type": "object", "$defs": {}, "properties": {} }
+  }
+]
+```
+
+`inputParameters` and `outputParameters` are plain JSON Schema, including
+`$ref` into `$defs`. Snake case spellings are accepted too. Nothing else is
+required, and nothing in the pipeline is specific to any one provider.
+
+## Layout
+
+| path | purpose |
+| --- | --- |
+| `src/extract.ts` | JSON Schema flattening. Knows nothing about any service |
+| `src/entities.ts` | entity registry, service inference, producer ranking |
+| `src/graph.ts` | builds the bipartite graph |
+| `src/viz.ts` | inlines the graph into `graph.html` |
+| `check.py` | the eight assertions |
+| `viz.template.html` | page source before data is inlined |
+

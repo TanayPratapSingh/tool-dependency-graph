@@ -175,5 +175,139 @@
   </aside>
 </div>
 
+<script src="vendor/cytoscape.min.js"></script>
+<script>
+const DATA = __GRAPH_DATA__;
+
+const toolBySlug = new Map(DATA.tools.map(t => [t.slug, t]));
+const entityById = new Map(DATA.entities.map(e => [e.id, e]));
+const planBySlug = new Map(DATA.plans.map(p => [p.slug, p]));
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const s = DATA.stats;
+document.getElementById("stats").innerHTML =
+  `<b>${s.tools}</b> tools, <b>${s.entities}</b> entities, <b>${s.edges}</b> edges. ` +
+  `<b>${s.requiredEntitySlotsWithProducer}</b> of <b>${s.requiredSlotsMappedToEntity}</b> ` +
+  `required typed inputs can be supplied by another tool.`;
+
+const countFor = svc => DATA.tools.filter(t => t.service === svc).length;
+const services = [...new Set(DATA.tools.map(t => t.service))].sort((a, b) => countFor(b) - countFor(a));
+const sel = document.getElementById("service");
+for (const svc of services) {
+  const o = document.createElement("option");
+  o.value = svc;
+  o.textContent = `${svc} (${countFor(svc)})`;
+  sel.appendChild(o);
+}
+
+// Drawing every tool at once is unreadable, so the view is scoped to one
+// service and capped at the busiest nodes. The cap is stated, never hidden.
+const NODE_CAP = 260;
+
+function buildElements() {
+  const service = sel.value;
+  const opaqueOnly = document.getElementById("opaqueOnly").checked;
+  const requiredOnly = document.getElementById("requiredOnly").checked;
+
+  const entities = DATA.entities.filter(e =>
+    (e.services.includes(service) || e.services.includes("*")) &&
+    (!opaqueOnly || e.opaque) &&
+    (e.producerCount > 0 || e.consumerCount > 0));
+  const entityIds = new Set(entities.map(e => e.id));
+
+  const edges = DATA.edges.filter(e => {
+    const eid = e.kind === "produces" ? e.target : e.source;
+    const slug = e.kind === "produces" ? e.source : e.target;
+    if (!entityIds.has(eid)) return false;
+    const tool = toolBySlug.get(slug);
+    if (!tool || tool.service !== service) return false;
+    if (requiredOnly && e.kind === "requires" && !e.required) return false;
+    return true;
+  });
+
+  const degree = new Map();
+  for (const e of edges) {
+    const slug = e.kind === "produces" ? e.source : e.target;
+    degree.set(slug, (degree.get(slug) || 0) + 1);
+  }
+  const keep = new Set([...degree.entries()].sort((a, b) => b[1] - a[1]).slice(0, NODE_CAP).map(([k]) => k));
+
+  const nodes = [
+    ...entities.map(e => ({ data: {
+      id: e.id, label: e.id.split(".")[1] || e.id, kind: "entity",
+      deg: e.producerCount + e.consumerCount } })),
+    ...[...keep].map(slug => ({ data: {
+      id: slug, label: slug.replace(/^(GITHUB|GOOGLESUPER)_/, ""), kind: "tool" } })),
+  ];
+
+  const finalEdges = edges
+    .filter(e => keep.has(e.kind === "produces" ? e.source : e.target))
+    .map((e, i) => ({ data: { id: `e${i}`, source: e.source, target: e.target, kind: e.kind } }));
+
+  return { nodes, finalEdges, shown: keep.size, total: countFor(service) };
+}
+
+let cy;
+function render() {
+  const { nodes, finalEdges, shown, total } = buildElements();
+  if (cy) cy.destroy();
+
+  cy = cytoscape({
+    container: document.getElementById("cy"),
+    elements: [...nodes, ...finalEdges],
+    style: [
+      { selector: 'node[kind="tool"]', style: {
+          "background-color": css("--node-tool"), label: "",
+          width: 9, height: 9, "font-size": 9, "font-family": "ui-monospace, Menlo, monospace",
+          color: css("--ink-2"), "text-valign": "center", "text-halign": "right",
+          "text-margin-x": 5, "text-outline-width": 3, "text-outline-color": css("--halo") } },
+      { selector: 'node[kind="tool"].lbl, node[kind="tool"].hot', style: { label: "data(label)" } },
+      { selector: 'node[kind="entity"]', style: {
+          "background-color": css("--node-entity"), label: "data(label)",
+          width: "mapData(deg, 0, 120, 22, 62)", height: "mapData(deg, 0, 120, 22, 62)",
+          "font-size": 12, "font-weight": 600, color: css("--ink"),
+          "text-valign": "bottom", "text-halign": "center", "text-margin-y": 4,
+          "text-outline-width": 3, "text-outline-color": css("--halo") } },
+      { selector: 'edge[kind="produces"]', style: {
+          "line-color": css("--produces"), width: 1.2,
+          "target-arrow-color": css("--produces"), "target-arrow-shape": "triangle",
+          "arrow-scale": .6, "curve-style": "bezier", opacity: .75 } },
+      { selector: 'edge[kind="requires"]', style: {
+          "line-color": css("--requires"), width: 1.2,
+          "target-arrow-color": css("--requires"), "target-arrow-shape": "triangle",
+          "arrow-scale": .6, "curve-style": "bezier", opacity: .75 } },
+      { selector: ".dim", style: { opacity: .06 } },
+      { selector: ".hot", style: { "border-width": 2, "border-color": css("--focus"), opacity: 1 } },
+    ],
+    layout: { name: "cose", animate: false, nodeRepulsion: 9000, idealEdgeLength: 70,
+              nodeOverlap: 14, gravity: .3, numIter: 900 },
+    wheelSensitivity: .25,
+  });
+
+  // Cytoscape measures the container once at init. If the pane is still
+  // settling the drawing gets fitted to a stale box and then sits in a
+  // corner of a larger canvas, so re-fit on the next frame and on resize.
+  const refit = () => { cy.resize(); cy.fit(undefined, 28); };
+  requestAnimationFrame(refit);
+  if (window.__refit) window.removeEventListener("resize", window.__refit);
+  let t; window.__refit = () => { clearTimeout(t); t = setTimeout(refit, 120); };
+  window.addEventListener("resize", window.__refit);
+
+  cy.on("tap", "node", evt => showDetail(evt.target.id()));
+  cy.on("tap", evt => { if (evt.target === cy) clearHighlight(); });
+  cy.on("mouseover", 'node[kind="tool"]', evt => evt.target.addClass("lbl"));
+  cy.on("mouseout", 'node[kind="tool"]', evt => evt.target.removeClass("lbl"));
+
+  document.getElementById("capNote")?.remove();
+  if (shown < total) {
+    const n = document.createElement("p");
+    n.id = "capNote"; n.className = "cap";
+    n.textContent = `Showing the ${shown} most connected of ${total} tools.`;
+    document.getElementById("cy").appendChild(n);
+  }
+}
+
+</script>
 </body>
 </html>

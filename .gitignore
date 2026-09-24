@@ -1,0 +1,7 @@
+node_modules/
+.env*
+.ref/
+data/catalog/
+data/graph.sample.json
+*.log
+.DS_Store

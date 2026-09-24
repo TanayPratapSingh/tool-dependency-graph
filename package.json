@@ -1,0 +1,13 @@
+{
+  "name": "tool-dependency-graph",
+  "version": "1.0.0",
+  "description": "Discover which agent tools must run before which, from their JSON Schemas",
+  "type": "module",
+  "scripts": {
+    "graph": "bun run src/graph.ts",
+    "viz": "bun run src/viz.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.11"
+  }
+}

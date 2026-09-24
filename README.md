@@ -122,10 +122,10 @@ Measured on a production catalog of 1,391 tools across two large toolkits.
 | Tools | 1,391 |
 | Canonical entities | 46 |
 | Edges | 3,278 |
-| Input slots | 7,102, of which 2,728 are required |
+| Input slots | 7,101, of which 2,728 are required |
 | Required slots resolved to an entity | 1,770 of 2,728 (65%) |
 | Of those, with at least one producer | 1,768 of 1,770 (99.9%) |
-| Tools with a real output schema | 1,239 of 1,391 (89%) |
+| Tools with a real output schema | 1,238 of 1,391 (89%) |
 | Tools needing the slug inference fallback | 0 |
 | Handle shaped slots with no entity yet | 568 |
 

@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-09-24T19:25:09.586Z",
+  "generatedAt": "2026-09-24T19:47:43.545Z",
   "stats": {
     "tools": 1391,
     "entities": 46,
     "edges": 3278,
-    "inputSlots": 7102,
+    "inputSlots": 7101,
     "requiredSlots": 2728,
     "requiredSlotsMappedToEntity": 1770,
     "requiredEntitySlotsWithProducer": 1768,
-    "toolsWithOutputSchema": 1239,
+    "toolsWithOutputSchema": 1238,
     "toolsUsingSlugInference": 0,
     "unresolvedHandleSlots": 568,
     "serviceBreakdown": {
@@ -44137,7 +44137,7 @@
         }
       ],
       "produces": [],
-      "hasOutputSchema": true
+      "hasOutputSchema": false
     },
     {
       "slug": "GITHUB_CREATE_REACTION_FOR_A_COMMIT_COMMENT",
@@ -75062,14 +75062,6 @@
           "entityId": null,
           "category": "control",
           "reason": "paging or formatting knob"
-        },
-        {
-          "path": "composio_execution_message",
-          "name": "composio_execution_message",
-          "required": false,
-          "entityId": null,
-          "category": "user_supplied",
-          "reason": "no handle shape, assumed user supplied"
         }
       ],
       "produces": [

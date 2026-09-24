@@ -664,3 +664,68 @@ export function classifySlot(
  * (ADD, SEND and UPDATE act on a handle you already hold), and the noun has to
  * sit close behind the verb so it is the verb's object rather than a modifier.
  */
+const READ_VERBS = /^(LIST|SEARCH|GET|FETCH|FIND)$/;
+const CREATE_VERBS = /^(CREATE)$/;
+
+/** Dropped from the object phrase, they carry no noun content. */
+const ARTICLES = new Set(["A", "AN", "THE", "ALL", "MY"]);
+
+/** The object phrase ends here. Whatever follows modifies, it is not the object. */
+const PREPOSITIONS = new Set(["FOR", "TO", "IN", "OF", "FROM", "BY", "WITH", "ON", "AS", "AT", "INTO", "USING"]);
+
+/**
+ * The tokens between the verb and the first preposition, articles removed.
+ * LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER yields [REPOSITORIES].
+ */
+function objectPhrase(tokens: string[], verbIndex: number): string[] {
+  const phrase: string[] = [];
+  for (let i = verbIndex + 1; i < tokens.length; i += 1) {
+    const token = tokens[i] as string;
+    if (PREPOSITIONS.has(token)) break;
+    if (ARTICLES.has(token)) continue;
+    phrase.push(token);
+  }
+  return phrase;
+}
+
+/**
+ * English compound nouns are head final, and that distinction is the whole
+ * ballgame here:
+ *
+ *   CREATE_A_REPOSITORY_VARIABLE  -> head VARIABLE, so it does not yield a repo
+ *   CREATE_AN_ORGANIZATION_REPOSITORY -> head REPOSITORY, so it does
+ *   CREATE_AN_ISSUE_COMMENT -> head COMMENT, so it yields a comment, not an issue
+ *
+ * Matching any token in the phrase, which is the obvious first implementation,
+ * gets all three of those wrong.
+ */
+function headMatches(phrase: string[], nouns: string[]): boolean {
+  if (phrase.length === 0) return false;
+  const set = new Set(nouns.map((n) => n.toUpperCase()));
+
+  const head = phrase[phrase.length - 1] as string;
+  if (set.has(head)) return true;
+
+  // Multiword entities such as PULL_REQUEST are stored joined.
+  if (set.has(phrase.join("_"))) return true;
+  if (phrase.length >= 2 && set.has(phrase.slice(-2).join("_"))) return true;
+
+  return false;
+}
+
+function verbAndObject(slug: string, entity: Entity): { verb: "read" | "create"; hit: boolean } | null {
+  const tokens = slug.toUpperCase().split("_").filter(Boolean);
+  const index = tokens.findIndex((t) => READ_VERBS.test(t) || CREATE_VERBS.test(t));
+  if (index < 0) return null;
+
+  const verbToken = tokens[index] as string;
+  const hit = headMatches(objectPhrase(tokens, index), entity.objectNouns);
+
+  return { verb: READ_VERBS.test(verbToken) ? "read" : "create", hit };
+}
+
+export function slugImpliesProduction(slug: string, entity: Entity): boolean {
+  const match = verbAndObject(slug, entity);
+  return match !== null && match.hit;
+}
+

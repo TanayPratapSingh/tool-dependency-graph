@@ -264,3 +264,56 @@ const plans = tools.map((tool) => {
   return { slug: tool.slug, precursors, askUser };
 });
 
+// ---------------------------------------------------------------- stats ----
+
+const allSlots = tools.flatMap((t) => t.slots);
+const requiredSlots = allSlots.filter((s) => s.required);
+const requiredEntitySlots = requiredSlots.filter((s) => s.entityId);
+const satisfiable = requiredEntitySlots.filter((s) => (producersOf.get(s.entityId as string) ?? []).length > 0);
+const bySlugInference = tools.filter((t) => t.produces.some((p) => p.via === "slug_inference")).length;
+
+const stats = {
+  tools: tools.length,
+  entities: ENTITIES.length,
+  edges: edges.length,
+  inputSlots: allSlots.length,
+  requiredSlots: requiredSlots.length,
+  requiredSlotsMappedToEntity: requiredEntitySlots.length,
+  requiredEntitySlotsWithProducer: satisfiable.length,
+  toolsWithOutputSchema: tools.filter((t) => t.hasOutputSchema).length,
+  toolsUsingSlugInference: bySlugInference,
+  unresolvedHandleSlots: allSlots.filter((s) => s.category === "unresolved").length,
+  serviceBreakdown: Object.fromEntries(
+    [...tools.reduce((acc, t) => acc.set(t.service, (acc.get(t.service) ?? 0) + 1), new Map<string, number>())].sort(
+      (a, b) => b[1] - a[1],
+    ),
+  ),
+};
+
+const entityNodes = ENTITIES.map((e) => ({
+  id: e.id,
+  label: e.label,
+  services: e.services,
+  opaque: e.opaque,
+  notes: e.notes ?? "",
+  producerCount: (producersOf.get(e.id) ?? []).length,
+  consumerCount: (consumersOf.get(e.id) ?? []).length,
+}));
+
+await writeFile(
+  outputPath,
+  JSON.stringify({ generatedAt: new Date().toISOString(), stats, entities: entityNodes, tools, edges, plans }, null, 2),
+  "utf-8",
+);
+
+console.log("\n--- graph ---");
+for (const [key, value] of Object.entries(stats)) {
+  if (typeof value === "object") continue;
+  console.log(`  ${key}: ${value}`);
+}
+console.log(`  services: ${JSON.stringify(stats.serviceBreakdown)}`);
+const pct = requiredEntitySlots.length
+  ? ((satisfiable.length / requiredEntitySlots.length) * 100).toFixed(1)
+  : "0.0";
+console.log(`  required entity slots with at least one producer: ${pct}%`);
+console.log(`\nwrote ${outputPath}`);

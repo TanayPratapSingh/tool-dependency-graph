@@ -770,3 +770,51 @@ export function producerScore(
 }
 
 
+/**
+ * Leaf names that carry no meaning on their own. GOOGLESUPER_LIST_THREADS
+ * returns data.threads[].id, and "id" alone is unresolvable: the entity is
+ * named by the parent segment, not the leaf.
+ */
+const GENERIC_LEAVES = new Set(["id", "ids", "number", "key", "slug", "value"]);
+
+/** Path segments that are pure envelope and name nothing. */
+const ENVELOPE_SEGMENTS = new Set([
+  "data", "response", "response_data", "result", "results", "items", "records", "entries", "list",
+]);
+
+function segmentNames(segment: string, entity: Entity): boolean {
+  const base = normalizeName(segment);
+  const variants = new Set([base, base.endsWith("s") ? base.slice(0, -1) : `${base}s`]);
+  return entity.objectNouns.some((noun) => variants.has(normalizeName(noun)));
+}
+
+/**
+ * Three tier resolution for an output field, widest context last:
+ *   1. the leaf name itself, for example thread_id
+ *   2. the nearest meaningful ancestor, so threads[].id resolves to a thread
+ *   3. the producing tool's own object, so LIST_REPOSITORY_ISSUES.items[].number
+ *      resolves to an issue even though every segment above it is envelope
+ */
+export function resolveEntityFromContext(
+  service: string,
+  path: string,
+  leafName: string,
+  ownerSlug: string,
+): Entity | null {
+  const direct = resolveEntity(service, leafName);
+  if (direct) return direct;
+
+  if (!GENERIC_LEAVES.has(normalizeName(leafName))) return null;
+
+  const scoped = ENTITIES.filter((e) => e.services.includes(service) || e.services.includes("*"));
+
+  const segments = path.split(".").map((x) => x.replace(/\[\]$/, "")).filter(Boolean);
+  for (let i = segments.length - 2; i >= 0; i -= 1) {
+    const segment = segments[i] as string;
+    if (ENVELOPE_SEGMENTS.has(normalizeName(segment))) continue;
+    const hit = scoped.find((e) => segmentNames(segment, e));
+    if (hit) return hit;
+  }
+
+  return scoped.find((e) => slugImpliesProduction(ownerSlug, e)) ?? null;
+}

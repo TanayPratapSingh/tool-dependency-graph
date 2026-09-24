@@ -92,3 +92,105 @@ function defNames(schema: JsonSchema | undefined): string[] {
   return defs && typeof defs === "object" ? Object.keys(defs) : [];
 }
 
+type ResolvedSlot = {
+  path: string;
+  name: string;
+  required: boolean;
+  entityId: EntityId | null;
+  category: string;
+  reason: string;
+};
+
+type ToolNode = {
+  slug: string;
+  toolkit: string;
+  service: string;
+  displayName: string;
+  slots: ResolvedSlot[];
+  produces: Array<{ entityId: EntityId; via: "schema" | "slug_inference"; evidence: string }>;
+  hasOutputSchema: boolean;
+};
+
+const sources = await loadTools();
+const tools: ToolNode[] = [];
+
+for (const source of sources) {
+  const inputs = flattenSchema(source.inputSchema);
+  const outputs = flattenSchema(source.outputSchema);
+
+  const service = inferService(
+    {
+      slug: source.slug,
+      description: source.description,
+      paramNames: inputs.map((s) => s.name),
+      defNames: defNames(source.outputSchema),
+    },
+    source.toolkit,
+  );
+
+  const slots: ResolvedSlot[] = inputs.map((slot: Slot) => {
+    const resolution = classifySlot(service, slot.name, slot.enumValues !== null);
+    return {
+      path: slot.path,
+      name: slot.name,
+      required: slot.required,
+      entityId: resolution.entityId,
+      category: resolution.category,
+      reason: resolution.reason,
+    };
+  });
+
+  // What this tool yields. Real output schemas first; slug inference only fills
+  // the gap where the catalog described no output at all, and is tagged as such.
+  type Produced = {
+    entityId: EntityId;
+    via: "schema" | "slug_inference";
+    evidence: string;
+    depth: number;
+    /** true when yielding this entity is what the tool is for, not a passenger field */
+    primary: boolean;
+  };
+  const produces = new Map<EntityId, Produced>();
+
+  const informative = outputs.filter(
+    (s) => !["successful", "success", "error", "log_id", "logId"].includes(s.name),
+  );
+
+  for (const slot of informative) {
+    const entity = resolveEntityFromContext(service, slot.path, slot.name, source.slug);
+    if (!entity) continue;
+    const core = coreFieldPath(slot.path) || slot.path;
+    const depth = core.split(".").filter(Boolean).length;
+    const primary = slugImpliesProduction(source.slug, entity);
+    const existing = produces.get(entity.id);
+    // Keep the shallowest sighting: that is the one closest to being the point.
+    if (existing && existing.depth <= depth) continue;
+    produces.set(entity.id, { entityId: entity.id, via: "schema", evidence: core, depth, primary });
+  }
+
+  if (informative.length === 0) {
+    for (const entity of ENTITIES) {
+      const inScope = entity.services.includes(service) || entity.services.includes("*");
+      if (inScope && slugImpliesProduction(source.slug, entity)) {
+        produces.set(entity.id, {
+          entityId: entity.id,
+          via: "slug_inference",
+          evidence: "slug verb and object noun",
+          depth: 1,
+          primary: true,
+        });
+      }
+    }
+  }
+
+  tools.push({
+    slug: source.slug,
+    toolkit: source.toolkit,
+    service,
+    displayName: source.displayName,
+    slots,
+    produces: [...produces.values()],
+    hasOutputSchema: informative.length > 0,
+  });
+}
+

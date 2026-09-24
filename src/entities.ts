@@ -610,3 +610,57 @@ export function resolveEntity(service: string, leafName: string): Entity | null 
   return crossServiceMatch;
 }
 
+export function classifySlot(
+  service: string,
+  leafName: string,
+  hasEnum: boolean,
+): SlotResolution {
+  const normalized = normalizeName(leafName);
+
+  const entity = resolveEntity(service, leafName);
+  if (entity) {
+    return {
+      entityId: entity.id,
+      category: "tool_derived",
+      reason: entity.opaque
+        ? `opaque handle, resolves to ${entity.id}`
+        : `resolves to ${entity.id}, user may also supply it directly`,
+    };
+  }
+
+  if (hasEnum) {
+    return { entityId: null, category: "enum_or_constant", reason: "fixed vocabulary" };
+  }
+  if (CONTROL_PARAMS.has(normalized)) {
+    return { entityId: null, category: "control", reason: "paging or formatting knob" };
+  }
+  if (USER_SUPPLIED.has(normalized)) {
+    return { entityId: null, category: "user_supplied", reason: "freeform content authored by the user" };
+  }
+
+  // Looks like a handle by shape but matched no entity. Worth reporting.
+  if (/(^|_)(id|ids|number|sha|token|slug|key|uri|resource_name)$/.test(normalized)) {
+    return {
+      entityId: null,
+      category: "unresolved",
+      reason: "handle shaped name with no entity in the registry",
+    };
+  }
+
+  return { entityId: null, category: "user_supplied", reason: "no handle shape, assumed user supplied" };
+}
+
+/**
+ * Slug inference fallback, used only where the catalog described no output at
+ * all. Every edge built this way is tagged so provenance stays visible.
+ *
+ * The first version of this was far too loose: any producing verb plus the noun
+ * appearing anywhere in the slug counted. That credited
+ * GITHUB_ADD_SELECTED_REPOSITORY_TO_ORGANIZATION_VARIABLE with producing a
+ * repository, when its actual object is a variable and the caller already had
+ * to know the repository to call it.
+ *
+ * Two corrections: only read verbs and CREATE genuinely yield a new handle
+ * (ADD, SEND and UPDATE act on a handle you already hold), and the noun has to
+ * sit close behind the verb so it is the verb's object rather than a modifier.
+ */

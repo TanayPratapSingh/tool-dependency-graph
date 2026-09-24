@@ -93,3 +93,94 @@ function resolveRef(schema: JsonSchema, root: JsonSchema): JsonSchema {
   return cursor && typeof cursor === "object" ? (cursor as JsonSchema) : schema;
 }
 
+export function flattenSchema(root: JsonSchema | null | undefined): Slot[] {
+  if (!root || typeof root !== "object") return [];
+
+  const slots: Slot[] = [];
+  const activeRefs = new Set<string>();
+
+  function visit(
+    node: JsonSchema,
+    path: string,
+    name: string,
+    required: boolean,
+    repeated: boolean,
+    depth: number,
+  ): void {
+    if (!node || typeof node !== "object" || depth > MAX_DEPTH) return;
+
+    let schema = node;
+    const ref = typeof schema.$ref === "string" ? schema.$ref : null;
+    if (ref) {
+      // Recursive schemas exist in the wild. Visit each $ref once per branch.
+      if (activeRefs.has(ref)) return;
+      activeRefs.add(ref);
+      schema = resolveRef(schema, root);
+    }
+
+    // Collapse combinators onto the first branch that carries structure.
+    const branches = [schema.anyOf, schema.oneOf, schema.allOf].find(Array.isArray);
+    if (branches && branches.length > 0) {
+      const structural = branches.find((b) => b && (b.properties || b.items || b.$ref));
+      schema = { ...schema, ...(structural ?? branches[0]) };
+      if (typeof schema.$ref === "string") schema = resolveRef(schema, root);
+    }
+
+    if (schema.properties && typeof schema.properties === "object") {
+      const requiredKeys = new Set(Array.isArray(schema.required) ? schema.required : []);
+      for (const [key, child] of Object.entries(schema.properties)) {
+        visit(
+          child as JsonSchema,
+          path ? `${path}.${key}` : key,
+          key,
+          // Requiredness has to compound down the tree. attachment.s3key is
+          // required *within* attachment, but attachment itself is optional,
+          // so the caller is not obliged to supply s3key at all.
+          required && requiredKeys.has(key),
+          repeated,
+          depth + 1,
+        );
+      }
+      if (ref) activeRefs.delete(ref);
+      return; // the container itself is not a slot, only its leaves are
+    }
+
+    if (schema.items) {
+      const item = Array.isArray(schema.items) ? schema.items[0] : schema.items;
+      const itemSchema = item as JsonSchema | undefined;
+      const itemHasShape =
+        itemSchema &&
+        typeof itemSchema === "object" &&
+        (itemSchema.properties || itemSchema.$ref || itemSchema.anyOf || itemSchema.oneOf);
+      if (itemHasShape) {
+        visit(itemSchema, `${path}[]`, name, required, true, depth + 1);
+        if (ref) activeRefs.delete(ref);
+        return;
+      }
+      // an array of scalars is itself the meaningful slot, so fall through
+    }
+
+    if (path) {
+      slots.push({
+        path,
+        name,
+        type: typeOf(schema),
+        required,
+        description: String(schema.description ?? schema.title ?? ""),
+        enumValues: Array.isArray(schema.enum) ? schema.enum.map((v) => String(v)) : null,
+        hasDefault: Object.hasOwn(schema, "default"),
+        repeated,
+      });
+    }
+
+    if (ref) activeRefs.delete(ref);
+  }
+
+  visit(root, "", "", true, false, 0);
+  return slots;
+}
+
+/**
+ * Path with response envelope segments removed, so that data.items[].id and
+ * id compare equal when deciding what a tool actually produces.
+ */

@@ -202,4 +202,89 @@ export const ENTITIES: Entity[] = [
   },
 
   // ---------- Google Calendar ----------
+  {
+    id: "googlecalendar.calendar_id",
+    label: "Calendar id",
+    services: ["googlecalendar"],
+    aliases: ["calendar_id", "calendarid"],
+    objectNouns: ["CALENDAR", "CALENDARS"],
+    opaque: true,
+    notes: "Defaults to the literal 'primary' on many tools, which makes it optional in practice.",
+  },
+  {
+    id: "googlecalendar.event_id",
+    label: "Calendar event id",
+    services: ["googlecalendar"],
+    aliases: ["event_id", "eventid"],
+    objectNouns: ["EVENT", "EVENTS"],
+    opaque: true,
+  },
+
+  // ---------- Google Drive and editors ----------
+  {
+    id: "googledrive.file_id",
+    label: "Drive file id",
+    services: ["googledrive", "googlephotos"],
+    aliases: ["file_id", "fileid", "drive_file_id"],
+    objectNouns: ["FILE", "FILES"],
+    opaque: true,
+  },
+  {
+    id: "googledrive.folder_id",
+    label: "Drive folder id",
+    services: ["googledrive"],
+    aliases: ["folder_id", "folderid", "parent_id", "parent_folder_id"],
+    objectNouns: ["FOLDER", "FOLDERS"],
+    opaque: true,
+  },
+  {
+    id: "googledocs.document_id",
+    label: "Google Docs document id",
+    services: ["googledocs"],
+    aliases: ["document_id", "documentid", "doc_id"],
+    objectNouns: ["DOCUMENT", "DOCUMENTS", "DOC", "DOCS"],
+    opaque: true,
+  },
+  {
+    id: "googlesheets.spreadsheet_id",
+    label: "Spreadsheet id",
+    services: ["googlesheets"],
+    aliases: ["spreadsheet_id", "spreadsheetid"],
+    objectNouns: ["SPREADSHEET", "SPREADSHEETS"],
+    opaque: true,
+  },
+  {
+    id: "googlesheets.sheet_id",
+    label: "Worksheet id",
+    services: ["googlesheets"],
+    aliases: ["sheet_id", "sheetid", "worksheet_id"],
+    objectNouns: ["SHEET", "SHEETS", "WORKSHEET"],
+    opaque: true,
+  },
+  {
+    id: "googletasks.tasklist_id",
+    label: "Task list id",
+    services: ["googletasks"],
+    aliases: ["tasklist_id", "task_list_id", "tasklist"],
+    objectNouns: ["TASKLIST", "TASKLISTS", "TASK_LIST"],
+    opaque: true,
+  },
+  {
+    id: "googletasks.task_id",
+    label: "Task id",
+    services: ["googletasks"],
+    aliases: ["task_id", "taskid"],
+    objectNouns: ["TASK", "TASKS"],
+    opaque: true,
+  },
+  {
+    id: "googlecontacts.contact_id",
+    label: "Contact resource name",
+    services: ["googlecontacts"],
+    aliases: ["contact_id", "resource_name", "person_id", "people_id"],
+    objectNouns: ["CONTACT", "CONTACTS", "PEOPLE", "PERSON"],
+    opaque: true,
+  },
+
+  // ---------- GitHub ----------
 ];

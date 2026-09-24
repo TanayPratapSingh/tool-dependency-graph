@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <style>
+    .tool  { fill: #8a8b93; }
+    .hub   { fill: #17181b; }
+    .lbl   { fill: #55565c; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .hublbl{ fill: #17181b; font-size: 13px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .cap   { fill: #8a8b93; font-size: 12px; }
+    .prod  { stroke: #1f6feb; stroke-width: 1.4; fill: none; }
+    .req   { stroke: #b25e09; stroke-width: 1.4; fill: none; }
+    .key   { font-size: 12px; }
+    @media (prefers-color-scheme: dark) {
+      .tool { fill: #4a4b52; } .hub { fill: #eceded; }
+      .lbl  { fill: #a1a2a8; } .hublbl { fill: #eceded; } .cap { fill: #74757b; }
+      .prod { stroke: #5a9cf8; } .req { stroke: #e0963c; }
+    }
+  </style>
+
+  <defs>
+    <marker id="ap" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">
+      <path d="M0,0 L6,2.5 L0,5 z" fill="#1f6feb"/>
+    </marker>
+    <marker id="ar" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">
+      <path d="M0,0 L6,2.5 L0,5 z" fill="#b25e09"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="28" class="cap">tools that produce it</text>
+  <text x="330" y="28" class="cap">entity</text>
+  <text x="556" y="28" class="cap">tools that need it</text>
+
+  <path class="prod" marker-end="url(#ap)" d="M196,72 C260,72 292,124 336,138"/>
+  <path class="prod" marker-end="url(#ap)" d="M196,140 C250,140 290,140 336,143"/>
+  <path class="prod" marker-end="url(#ap)" d="M196,208 C260,208 292,160 336,150"/>
+
+  <circle cx="186" cy="72"  r="5" class="tool"/>
+  <circle cx="186" cy="140" r="5" class="tool"/>
+  <circle cx="186" cy="208" r="5" class="tool"/>
+  <text x="176" y="76"  class="lbl" text-anchor="end">LIST_THREADS</text>
+  <text x="176" y="144" class="lbl" text-anchor="end">FETCH_EMAILS</text>
+  <text x="176" y="212" class="lbl" text-anchor="end">FETCH_MESSAGE_BY_THREAD_ID</text>
+
+  <circle cx="380" cy="144" r="26" class="hub"/>
+  <text x="380" y="196" class="hublbl" text-anchor="middle">gmail.thread_id</text>
+
+  <path class="req" marker-end="url(#ar)" d="M424,138 C470,124 500,80 544,74"/>
+  <path class="req" marker-end="url(#ar)" d="M424,146 C478,146 500,142 544,142"/>
+  <path class="req" marker-end="url(#ar)" d="M424,152 C470,166 500,204 544,210"/>
+
+  <circle cx="554" cy="74"  r="5" class="tool"/>
+  <circle cx="554" cy="142" r="5" class="tool"/>
+  <circle cx="554" cy="210" r="5" class="tool"/>
+  <text x="566" y="78"  class="lbl">REPLY_TO_THREAD</text>
+  <text x="566" y="146" class="lbl">MODIFY_THREAD_LABELS</text>
+  <text x="566" y="214" class="lbl">DELETE_THREAD</text>
+
+  <line x1="24" y1="266" x2="44" y2="266" class="prod"/>
+  <text x="52" y="270" class="cap key">produces</text>
+  <line x1="130" y1="266" x2="150" y2="266" class="req"/>
+  <text x="158" y="270" class="cap key">requires</text>
+  <text x="240" y="270" class="cap key">six edges here, not nine: producers plus consumers, never producers times consumers</text>
+</svg>

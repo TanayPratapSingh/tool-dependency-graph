@@ -194,3 +194,18 @@ required, and nothing in the pipeline is specific to any one provider.
 | `check.py` | the eight assertions |
 | `viz.template.html` | page source before data is inlined |
 
+## Limitations
+
+- **The registry is hand built.** 46 entities cover the common handles, not all
+  of them. 568 handle shaped slots still resolve to nothing.
+- **Producer ranking is a heuristic.** It prefers a read verb whose direct
+  object is the entity, a shallow output path, and locality. It gets the common
+  cases right and will get exotic ones wrong.
+- **Some schemas are thinner than reality.** One contacts search tool in the
+  measured catalog declares no email field in its output, so it gets no credit
+  for supplying an address even though it plainly returns people. The graph
+  reflects the catalog, not the API behind it.
+- **No transitive planning.** This answers "what comes immediately before".
+  Chaining those into a full plan is the obvious next step and is not built.
+- **The raw catalog is not redistributed here.** Only the derived graph and the
+  small fixture are committed.

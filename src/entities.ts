@@ -590,3 +590,23 @@ function nameVariants(name: string): string[] {
  * Resolves one input slot to a canonical entity, scoped to the owning service.
  * Returns null rather than guessing when nothing matches cleanly.
  */
+export function resolveEntity(service: string, leafName: string): Entity | null {
+  const variants = nameVariants(leafName);
+  let crossServiceMatch: Entity | null = null;
+
+  for (const entity of ENTITIES) {
+    const scoped = entity.services.includes(service);
+    const global = entity.services.includes("*");
+    if (!scoped && !global) continue;
+
+    const hit = entity.aliases.some((alias) => variants.includes(normalizeName(alias)));
+    if (!hit) continue;
+
+    // A service scoped match always beats a cross service one.
+    if (scoped) return entity;
+    crossServiceMatch ??= entity;
+  }
+
+  return crossServiceMatch;
+}
+

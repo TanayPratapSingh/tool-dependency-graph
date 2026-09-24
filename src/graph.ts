@@ -220,3 +220,47 @@ for (const tool of tools) {
   }
 }
 
+/**
+ * Per tool answer to the question the task actually poses: before running this,
+ * what must be fetched by another call, and what must be asked of the user.
+ */
+const PRECURSOR_CAP = 12;
+const plans = tools.map((tool) => {
+  const precursors: Record<string, string[]> = {};
+  const askUser: string[] = [];
+
+  for (const slot of tool.slots) {
+    if (slot.entityId) {
+      const entity = entityById(slot.entityId);
+      const candidates = (producersOf.get(slot.entityId) ?? []).filter((p) => p.slug !== tool.slug);
+      if (candidates.length > 0 && entity) {
+        // Incidental producers are suppressed entirely whenever a primary one
+        // exists, so the answer to "how do I get an issue number" is the issue
+        // listing rather than any of the hundreds of tools whose response
+        // happens to embed an issue object.
+        const primary = candidates.filter((p) => p.primary);
+        const byPurpose = primary.length > 0 ? primary : candidates;
+
+        // Stay inside the toolkit when anything there can supply the value.
+        const local = byPurpose.filter((p) => p.toolkit === tool.toolkit);
+        const pool = local.length > 0 ? local : byPurpose;
+
+        precursors[slot.entityId] = pool
+          .map((p) => ({
+            slug: p.slug,
+            score: producerScore(p.slug, entity, p.via, p.depth, p.primary,
+                                 p.service === tool.service, p.toolkit === tool.toolkit),
+          }))
+          .sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug))
+          .slice(0, PRECURSOR_CAP)
+          .map((p) => p.slug);
+      } else if (slot.required) {
+        askUser.push(`${slot.name} (${slot.entityId}, no producer found)`);
+      }
+    } else if (slot.required && (slot.category === "user_supplied" || slot.category === "unresolved")) {
+      askUser.push(`${slot.name} (${slot.category})`);
+    }
+  }
+  return { slug: tool.slug, precursors, askUser };
+});
+

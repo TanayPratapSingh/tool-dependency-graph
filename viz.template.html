@@ -308,6 +308,82 @@ function render() {
   }
 }
 
+function clearHighlight() {
+  cy.elements().removeClass("dim hot lbl");
+  document.getElementById("panel").innerHTML =
+    '<p class="placeholder">Select a tool or an entity to see what it needs and what can supply it.</p>';
+}
+
+const esc = x => String(x).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const list = xs => `<ul>${xs.join("")}</ul>`;
+const heading = (label, n) => `<h2>${label}${n === undefined ? "" : ` <span class="count">${n}</span>`}</h2>`;
+
+function showDetail(id) {
+  const panel = document.getElementById("panel");
+  const node = cy.getElementById(id);
+  cy.elements().addClass("dim").removeClass("hot lbl");
+  node.closedNeighborhood().removeClass("dim");
+  node.closedNeighborhood().nodes().addClass("lbl");
+  node.addClass("hot");
+
+  if (entityById.has(id)) {
+    const e = entityById.get(id);
+    const producers = DATA.edges.filter(x => x.kind === "produces" && x.target === id).map(x => x.source);
+    const consumers = DATA.edges.filter(x => x.kind === "requires" && x.source === id).map(x => x.target);
+    panel.innerHTML = `
+      <p class="kicker">Entity</p>
+      <p class="subject">${esc(e.id)}</p>
+      <p class="meta">${esc(e.label)}. ${e.opaque
+        ? "Opaque, so it has to come from a prior call."
+        : "A user can often supply this directly."}</p>
+      ${e.notes ? `<p class="meta">${esc(e.notes)}</p>` : ""}
+      ${heading("Produced by", producers.length)}
+      ${producers.length
+        ? list(producers.slice(0, 25).map(p => `<li><code>${esc(p)}</code></li>`))
+        : '<p class="none">No tool in this catalog returns it.</p>'}
+      ${heading("Required by", consumers.length)}
+      ${consumers.length
+        ? list(consumers.slice(0, 25).map(p => `<li><code>${esc(p)}</code></li>`))
+        : '<p class="none">Nothing requires it.</p>'}`;
+    return;
+  }
+
+  const tool = toolBySlug.get(id);
+  const plan = planBySlug.get(id) || { precursors: {}, askUser: [] };
+  const required = tool.slots.filter(x => x.required);
+
+  panel.innerHTML = `
+    <p class="kicker">Tool</p>
+    <p class="subject">${esc(tool.slug)}</p>
+    <p class="meta">${esc(tool.service)}${tool.hasOutputSchema
+      ? ""
+      : ". No output schema in the catalog, so what it returns is inferred from its slug"}</p>
+
+    ${heading("Call these first")}
+    ${Object.keys(plan.precursors).length
+      ? Object.entries(plan.precursors).map(([ent, tools]) => `
+          <div class="group"><code>${esc(ent)}</code>
+          ${list(tools.slice(0, 5).map(t => `<li><code>${esc(t)}</code></li>`))}</div>`).join("")
+      : '<p class="none">No input has to come from another tool.</p>'}
+
+    ${heading("Ask the user")}
+    ${plan.askUser.length
+      ? list(plan.askUser.map(a => `<li>${esc(a)}</li>`))
+      : '<p class="none">Every input can be resolved by another tool.</p>'}
+
+    ${heading("Required inputs", required.length)}
+    ${required.length
+      ? list(required.map(x => `<li><code>${esc(x.name)}</code><span class="tag">${esc(x.category)}</span></li>`))
+      : '<p class="none">No inputs are required.</p>'}
+
+    ${heading("Produces", tool.produces.length)}
+    ${tool.produces.length
+      ? list(tool.produces.map(p => `<li><code>${esc(p.entityId)}</code>${
+          p.primary ? '<span class="tag">primary</span>' : ""}${
+          p.via === "slug_inference" ? '<span class="tag">inferred</span>' : ""}</li>`))
+      : '<p class="none">No typed output.</p>'}`;
+}
+
 </script>
 </body>
 </html>

@@ -184,3 +184,60 @@ export function flattenSchema(root: JsonSchema | null | undefined): Slot[] {
  * Path with response envelope segments removed, so that data.items[].id and
  * id compare equal when deciding what a tool actually produces.
  */
+export function coreFieldPath(path: string): string {
+  return path
+    .split(".")
+    .map((segment) => segment.replace(/\[\]$/, ""))
+    .filter((segment) => !ENVELOPE_KEYS.has(segment))
+    .join(".");
+}
+
+export function normalizeTool(raw: RawTool, fallbackToolkit: string): NormalizedTool {
+  const slug = String(pick(raw, ["slug", "enum", "action_name", "actionName", "name"]) ?? "UNKNOWN");
+  const displayName = String(pick(raw, ["displayName", "display_name", "title", "name"]) ?? slug);
+  const description = String(pick(raw, ["description", "summary"]) ?? "");
+
+  const toolkitField = pick(raw, ["toolkit", "toolkit_slug", "toolkitSlug", "appName", "app_name", "app"]);
+  let toolkit = fallbackToolkit;
+  if (typeof toolkitField === "string") {
+    toolkit = toolkitField;
+  } else if (toolkitField && typeof toolkitField === "object") {
+    const obj = toolkitField as Record<string, unknown>;
+    toolkit = String(obj.slug ?? obj.name ?? fallbackToolkit);
+  }
+
+  const inputSchema = pick(raw, [
+    "input_parameters",
+    "inputParameters",
+    "parameters",
+    "input_schema",
+    "inputSchema",
+  ]) as JsonSchema | undefined;
+
+  const outputSchema = pick(raw, [
+    "output_parameters",
+    "outputParameters",
+    "response",
+    "output_schema",
+    "outputSchema",
+    "response_schema",
+  ]) as JsonSchema | undefined;
+
+  const inputs = flattenSchema(inputSchema);
+  const outputs = flattenSchema(outputSchema);
+
+  // An envelope of successful/error and nothing else is not a real output shape.
+  const informative = outputs.filter(
+    (slot) => !["successful", "success", "error", "log_id", "logId", "session_info"].includes(slot.name),
+  );
+
+  return {
+    slug,
+    displayName,
+    description,
+    toolkit: toolkit.toLowerCase(),
+    inputs,
+    outputs,
+    hasOutputSchema: informative.length > 0,
+  };
+}

@@ -141,3 +141,49 @@ export function inferService(signals: ServiceSignals, toolkit: string): string {
   return bestScore >= SERVICE_CONFIDENCE_FLOOR ? best : "google_other";
 }
 
+export const ENTITIES: Entity[] = [
+  // ---------- Gmail ----------
+  {
+    id: "gmail.thread_id",
+    label: "Gmail thread id",
+    services: ["gmail"],
+    aliases: ["thread_id", "threadid", "thread"],
+    objectNouns: ["THREAD", "THREADS", "EMAIL", "EMAILS", "MESSAGE", "MESSAGES"],
+    opaque: true,
+    notes: "Gmail message resources carry threadId, so message listings also yield thread ids.",
+  },
+  {
+    id: "gmail.message_id",
+    label: "Gmail message id",
+    services: ["gmail"],
+    aliases: ["message_id", "messageid", "msg_id", "email_id"],
+    objectNouns: ["EMAIL", "EMAILS", "MESSAGE", "MESSAGES", "THREAD", "THREADS"],
+    opaque: true,
+  },
+  {
+    id: "gmail.draft_id",
+    label: "Gmail draft id",
+    services: ["gmail"],
+    aliases: ["draft_id", "draftid"],
+    objectNouns: ["DRAFT", "DRAFTS"],
+    opaque: true,
+  },
+  {
+    id: "gmail.label_id",
+    label: "Gmail label id",
+    services: ["gmail"],
+    aliases: ["label_id", "label_ids", "labelid", "add_label_ids", "remove_label_ids"],
+    objectNouns: ["LABEL", "LABELS"],
+    opaque: true,
+  },
+  {
+    id: "gmail.attachment_id",
+    label: "Gmail attachment id",
+    services: ["gmail"],
+    aliases: ["attachment_id", "attachmentid"],
+    objectNouns: ["ATTACHMENT", "ATTACHMENTS"],
+    opaque: true,
+  },
+
+  // ---------- People, cross service ----------
+];

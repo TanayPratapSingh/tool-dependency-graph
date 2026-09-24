@@ -194,3 +194,29 @@ for (const source of sources) {
   });
 }
 
+// ---------------------------------------------------------------- edges ----
+
+type Edge = { source: string; target: string; kind: "produces" | "requires"; required?: boolean };
+
+const edges: Edge[] = [];
+const producersOf = new Map<EntityId, Array<{ slug: string; via: "schema" | "slug_inference"; depth: number; primary: boolean; service: string; toolkit: string }>>();
+const consumersOf = new Map<EntityId, string[]>();
+
+for (const tool of tools) {
+  for (const produced of tool.produces) {
+    edges.push({ source: tool.slug, target: produced.entityId, kind: "produces" });
+    producersOf.set(produced.entityId, [
+      ...(producersOf.get(produced.entityId) ?? []),
+      { slug: tool.slug, via: produced.via, depth: produced.depth, primary: produced.primary,
+        service: tool.service, toolkit: tool.toolkit },
+    ]);
+  }
+  const seen = new Set<EntityId>();
+  for (const slot of tool.slots) {
+    if (!slot.entityId || seen.has(slot.entityId)) continue;
+    seen.add(slot.entityId);
+    edges.push({ source: slot.entityId, target: tool.slug, kind: "requires", required: slot.required });
+    consumersOf.set(slot.entityId, [...(consumersOf.get(slot.entityId) ?? []), tool.slug]);
+  }
+}
+

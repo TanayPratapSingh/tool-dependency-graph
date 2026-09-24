@@ -384,6 +384,22 @@ function showDetail(id) {
       : '<p class="none">No typed output.</p>'}`;
 }
 
+document.getElementById("search").addEventListener("input", ev => {
+  const q = ev.target.value.trim().toUpperCase();
+  if (!cy) return;
+  if (!q) { cy.elements().removeClass("dim hot lbl"); return; }
+  const hits = cy.nodes().filter(n => n.id().toUpperCase().includes(q));
+  cy.elements().addClass("dim");
+  hits.removeClass("dim").addClass("hot lbl");
+  hits.forEach(n => n.closedNeighborhood().removeClass("dim"));
+  if (hits.length === 1) showDetail(hits[0].id());
+});
+
+for (const el of ["service", "opaqueOnly", "requiredOnly"]) {
+  document.getElementById(el).addEventListener("change", render);
+}
+
+render();
 </script>
 </body>
 </html>
